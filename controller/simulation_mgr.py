@@ -19,7 +19,7 @@ class OFDMSimulationManager:
         """
         try:
             n_fft, nc, cp_ratio, df = utils.get_ofdm_params(bw_idx, profile_idx)
-            img_size = 500
+            img_size = 250
             
             # 1. Obtener bits y SCRAMBLING (P5)
             tx_bits_raw, tx_img_matrix = utils.image_to_bits(image_path, img_size)
@@ -69,7 +69,7 @@ class OFDMSimulationManager:
                 "rx_image": rx_img_matrix,
                 "ber": ber,
                 "snr": snr_db,
-                "info": f"BER: {ber:.5f} | Modo: {config.MOD_CONSTELLATIONS[mod_type]} ({mode_str})"
+                "info": f"BER: {ber:.5f} | Modo: {mode_str}"
             }
 
         except Exception as e:
@@ -83,7 +83,7 @@ class OFDMSimulationManager:
         n_fft, nc, cp_ratio, df = utils.get_ofdm_params(bw_idx, profile_idx)
         
         # Usamos la imagen real + Scrambling para que sea realista
-        img_size = 500
+        img_size = 1500
         tx_bits_raw, _ = utils.image_to_bits(image_path, img_size)
         tx_bits = utils.apply_scrambling(tx_bits_raw) # <--- Scrambling activado
         
@@ -176,49 +176,3 @@ class OFDMSimulationManager:
             ber_values.append(ber)
             
         return snr_range, ber_values
-
-    def calculate_papr_distribution(self, image_path, bw_idx, profile_idx, mod_type):
-        """
-        Calcula la CCDF del PAPR usando los bloques OFDM generados por la IMAGEN.
-        """
-        n_fft, nc, cp_ratio, df = utils.get_ofdm_params(bw_idx, profile_idx)
-        
-        # Datos de la imagen ---
-        img_size = 250
-        tx_bits_raw, _ = utils.image_to_bits(image_path, img_size)
-        tx_bits = utils.apply_scrambling(tx_bits_raw)
-        
-        # 1. Mapear y Modular toda la imagen
-        syms = utils.map_bits_to_symbols(tx_bits, mod_type)
-        # Esto nos devuelve la señal completa en el tiempo y cuántos bloques ocupó
-        time_signal, num_blocks = ofdm_ops.modulate_ofdm(syms, n_fft, nc)
-        
-        papr_values = []
-        
-        # 2. Calcular PAPR bloque por bloque de la imagen
-        # La señal 'time_signal' es una concatenación de todos los bloques IFFT
-        for i in range(num_blocks):
-            # Extraer el bloque i-ésimo
-            block = time_signal[i*n_fft : (i+1)*n_fft]
-            
-            power = np.abs(block)**2
-            peak_pwr = np.max(power)
-            avg_pwr = np.mean(power)
-            
-            if avg_pwr > 0:
-                papr_val = 10 * np.log10(peak_pwr / avg_pwr)
-                papr_values.append(papr_val)
-        
-        # 3. Crear curva CCDF (Igual que antes)
-        thresholds = np.linspace(0, 12, 100) # dB
-        ccdf = []
-        papr_array = np.array(papr_values)
-        
-        for x in thresholds:
-            if len(papr_array) > 0:
-                prob = np.sum(papr_array > x) / len(papr_array)
-            else:
-                prob = 0
-            ccdf.append(prob)
-            
-        return thresholds, ccdf

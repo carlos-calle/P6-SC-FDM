@@ -85,31 +85,31 @@ class MainWindow(ctk.CTk):
 
         # Grupo 3: Selección de Archivo (NUEVO)
         self.lbl_source = ctk.CTkLabel(self.sidebar_frame, text="Fuente de Datos:", anchor="w")
-        self.lbl_source.grid(row=10, column=0, padx=20, pady=(20, 0))
+        self.lbl_source.grid(row=11, column=0, padx=20, pady=(20, 0))
 
         self.btn_select_file = ctk.CTkButton(self.sidebar_frame, text="Seleccionar Imagen...", 
                                              fg_color="#4B4B4B", hover_color="#5B5B5B", 
                                              command=self.select_file)
-        self.btn_select_file.grid(row=11, column=0, padx=20, pady=5)
+        self.btn_select_file.grid(row=12, column=0, padx=20, pady=5)
 
         self.lbl_filename = ctk.CTkLabel(self.sidebar_frame, text="[Ningún archivo]", font=("Arial", 11), text_color="gray")
-        self.lbl_filename.grid(row=12, column=0, padx=20, pady=0)
+        self.lbl_filename.grid(row=13, column=0, padx=20, pady=0)
 
         # Grupo 4: Botones de Acción
         self.btn_run_img = ctk.CTkButton(self.sidebar_frame, text="TRANSMITIR IMAGEN", 
                                          fg_color="#1f538d", hover_color="#14375e", # Azul profesional
                                          command=self.action_run_image)
-        self.btn_run_img.grid(row=13, column=0, padx=20, pady=(20, 10))
+        self.btn_run_img.grid(row=14, column=0, padx=20, pady=(20, 10))
 
         self.btn_run_ber = ctk.CTkButton(self.sidebar_frame, text="GENERAR CURVA BER", 
                                          fg_color="transparent", border_width=2, 
                                          command=self.action_plot_ber)
-        self.btn_run_ber.grid(row=14, column=0, padx=20, pady=10)
+        self.btn_run_ber.grid(row=15, column=0, padx=20, pady=10)
 
         self.btn_run_papr = ctk.CTkButton(self.sidebar_frame, text="ANALIZAR PAPR", 
                                           fg_color="transparent", border_width=2, 
                                           command=self.action_plot_papr)
-        self.btn_run_papr.grid(row=15, column=0, padx=20, pady=10)
+        self.btn_run_papr.grid(row=16, column=0, padx=20, pady=10)
 
 
         # --- PANEL CENTRAL (VISUALIZACIÓN) ---
