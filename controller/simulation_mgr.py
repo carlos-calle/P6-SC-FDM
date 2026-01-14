@@ -21,14 +21,14 @@ class OFDMSimulationManager:
             n_fft, nc, cp_ratio, df = utils.get_ofdm_params(bw_idx, profile_idx)
             img_size = 250
             
-            # 1. Obtener bits y SCRAMBLING (P5)
+            # 1. Obtener bits y scrambling
             tx_bits_raw, tx_img_matrix = utils.image_to_bits(image_path, img_size)
-            tx_bits = utils.apply_scrambling(tx_bits_raw) # <--- Vital
+            tx_bits = utils.apply_scrambling(tx_bits_raw)
             
             # 2. Mapeo a Símbolos
             tx_symbols = utils.map_bits_to_symbols(tx_bits, mod_type)
 
-            # 3. SC-FDM: Precodificación (P6)
+            # 3. SC-FDM: Precodificación 
             if is_scfdm:
                 tx_symbols = ofdm_ops.apply_dft_precoding(tx_symbols, nc)
             
@@ -44,17 +44,17 @@ class OFDMSimulationManager:
             rx_symbols_distorted = ofdm_ops.demodulate_ofdm(rx_signal_no_cp, n_fft, nc)
             rx_symbols_equalized = ofdm_ops.equalize_channel(rx_symbols_distorted, h_channel, n_fft, nc)
             
-            # 7. SC-FDM: Remover Precodificación (P6)
+            # 7. SC-FDM: Remover Precodificación
             if is_scfdm:
                 rx_symbols_equalized = ofdm_ops.remove_dft_precoding(rx_symbols_equalized, nc)
             
-            # 8. Demodulación y DESCRAMBLING (P5)
+            # 8. Demodulación y descrambling
             rx_bits_scrambled = utils.demap_symbols_to_bits(rx_symbols_equalized, mod_type)
             
             # Ajustar longitud y Descramblear
             valid_len = len(tx_bits)
             rx_bits_scrambled = rx_bits_scrambled[:valid_len]
-            rx_bits = utils.apply_scrambling(rx_bits_scrambled) # <--- Vital
+            rx_bits = utils.apply_scrambling(rx_bits_scrambled)
             
             # 9. Métricas (Comparando con RAW)
             bit_errors = np.sum(tx_bits_raw != rx_bits)
@@ -82,12 +82,12 @@ class OFDMSimulationManager:
         """
         n_fft, nc, cp_ratio, df = utils.get_ofdm_params(bw_idx, profile_idx)
         
-        # Usamos la imagen real + Scrambling para que sea realista
+        # Usamos la imagen real + Scrambling
         img_size = 1500
         tx_bits_raw, _ = utils.image_to_bits(image_path, img_size)
-        tx_bits = utils.apply_scrambling(tx_bits_raw) # <--- Scrambling activado
+        tx_bits = utils.apply_scrambling(tx_bits_raw)
         
-        # 1. Mapear bits scrambleados a símbolos
+        # 1. Mapear bits a símbolos
         syms = utils.map_bits_to_symbols(tx_bits, mod_type)
         
         # --- RAMA 1: OFDM (Estándar) ---
@@ -98,7 +98,6 @@ class OFDMSimulationManager:
         time_scfdm, _ = ofdm_ops.modulate_ofdm(syms_precoded, n_fft, nc)
         
         # Calcular PAPR bloque a bloque para ambas señales
-        # (Reutilizamos la lógica de bloques que ya tenías o calculamos directo)
         papr_ofdm = self._get_papr_values(time_ofdm, n_fft, num_blocks)
         papr_scfdm = self._get_papr_values(time_scfdm, n_fft, num_blocks)
         
