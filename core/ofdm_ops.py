@@ -1,38 +1,41 @@
 import numpy as np
 
-def modulate_ofdm(symbols, n_fft, nc):
+def modulate_ofdm(input_symbols, N, M):
     """
-    Empaqueta símbolos en subportadoras y aplica IFFT.
-    symbols: Array de símbolos complejos (QPSK/QAM)
-    n_fft: Tamaño total de la FFT (ej. 1024)
-    nc: Subportadoras activas (ej. 600)
+    Realiza el Mapeo de Subportadoras y la IDFT de tamaño N.
     """
-    num_symbols = len(symbols)
-    # Número de bloques OFDM necesarios
-    num_blocks = int(np.ceil(num_symbols / nc))
+    num_symbols = len(input_symbols)
     
-    # Rellenar con ceros si el último bloque no está lleno
-    pad_len = num_blocks * nc - num_symbols
+    # 1. Calcular bloques necesarios
+    num_blocks = int(np.ceil(num_symbols / M))
+    
+    # 2. Calcular cuánto relleno falta
+    pad_len = num_blocks * M - num_symbols
+    
+    # 3. Rellenar con ceros (Padding)
     if pad_len > 0:
-        symbols = np.concatenate((symbols, np.zeros(pad_len)))
-        
-    ofdm_time_signal = []
+        # Concatenamos ceros al final para completar el bloque
+        input_symbols = np.concatenate((input_symbols, np.zeros(pad_len)))
+    
+    time_signal = []
     
     for i in range(num_blocks):
-        # Extraer bloque de símbolos
-        block = symbols[i*nc : (i+1)*nc]
+        # Tomar un bloque de tamaño M
+        block_data = input_symbols[i*M : (i+1)*M]
         
-        # Mapeo a entradas de IFFT
-        ifft_input = np.zeros(n_fft, dtype=complex)
+        # Vector de entrada a la IFFT
+        ifft_input = np.zeros(N, dtype=complex)
         
-        # Mapeo simple: Frecuencias 0 a Nc-1 (Parte positiva)
-        ifft_input[1:nc+1] = block # Dejamos DC en 0 vacío
+        # Insertamos los M datos en las posiciones activas
+        # (Saltamos la DC en el índice 0)
+        ifft_input[1 : M+1] = block_data 
         
-        # IFFT
-        time_sym = np.fft.ifft(ifft_input) * np.sqrt(n_fft) # Normalización de energía
-        ofdm_time_signal.extend(time_sym)
+        # IDFT de tamaño N
+        block_time = np.fft.ifft(ifft_input) * np.sqrt(N)
         
-    return np.array(ofdm_time_signal), num_blocks
+        time_signal.extend(block_time)
+        
+    return np.array(time_signal), num_blocks
 
 def add_cyclic_prefix(signal, num_blocks, n_fft, cp_ratio):
     """Añade el prefijo cíclico a cada bloque OFDM"""
@@ -111,44 +114,46 @@ def equalize_channel(rx_freq_symbols, h_impulse_response, n_fft, nc):
     return np.array(equalized_symbols)
 
 
-# P5/core/ofdm_ops.py (Añadir al final)
 
-def apply_dft_precoding(symbols, nc):
+def apply_dft_precoding(symbols, M):
     """
-    Aplica DFT (Precodificación) a los símbolos QAM.
-    Incluye PADDING automático para evitar errores de dimensión.
+    Aplica la DFT de tamaño M (Precodificación).
+    Entrada: Bloques de símbolos en el tiempo.
+    Salida: Símbolos en frecuencia (dominio de precodificación).
     """
     num_symbols = len(symbols)
-    # 1. Calcular bloques necesarios
-    num_blocks = int(np.ceil(num_symbols / nc))
-    # 2. Rellenar con ceros
-    pad_len = num_blocks * nc - num_symbols
+    
+    # Calcular bloques de tamaño M
+    num_blocks = int(np.ceil(num_symbols / M))
+    
+    # Padding para completar el último bloque de tamaño M
+    pad_len = num_blocks * M - num_symbols
     if pad_len > 0:
-        symbols_padded = np.concatenate((symbols, np.zeros(pad_len)))
-    else:
-        symbols_padded = symbols
+        symbols = np.concatenate((symbols, np.zeros(pad_len)))
 
     precoded_symbols = []
-    # 3. Procesar bloque a bloque
+    
     for i in range(num_blocks):
-        block = symbols_padded[i*nc : (i+1)*nc]
-        # FFT para precodificar (Mueve los símbolos QAM de Tiempo a Frecuencia)
-        precoded_block = np.fft.fft(block) 
-        precoded_symbols.extend(precoded_block)
+        # Tomamos un bloque de tamaño M
+        block_time = symbols[i*M : (i+1)*M]
+        
+        # DFT de tamaño M
+        block_freq = np.fft.fft(block_time) 
+        
+        precoded_symbols.extend(block_freq)
         
     return np.array(precoded_symbols)
 
-def remove_dft_precoding(equalized_symbols, nc):
-    """
-    Aplica IDFT para recuperar los símbolos QAM originales.
-    """
-    num_blocks = len(equalized_symbols) // nc
-    decoded_symbols = []
+def remove_dft_precoding(symbols, M):
+    """IDFT de tamaño M para recuperar símbolos QAM"""
+    num_blocks = len(symbols) // M
+    decoded = []
     
     for i in range(num_blocks):
-        block = equalized_symbols[i*nc : (i+1)*nc]
-        # IFFT para revertir la precodificación
-        decoded_block = np.fft.ifft(block)
-        decoded_symbols.extend(decoded_block)
+        block_freq = symbols[i*M : (i+1)*M]
         
-    return np.array(decoded_symbols)
+        # IDFT de tamaño M
+        block_time = np.fft.ifft(block_freq)
+        decoded.extend(block_time)
+        
+    return np.array(decoded)

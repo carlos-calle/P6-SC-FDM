@@ -3,12 +3,14 @@ import cv2
 from .config import LTE_BANDWIDTHS, LTE_PROFILES, MOD_CONSTELLATIONS
 
 def get_ofdm_params(bw_idx, profile_idx):
-    """Devuelve parámetros físicos calculados"""
+    """Devuelve parámetros físicos con nomenclatura M y N"""
     bw_hz, nc = LTE_BANDWIDTHS[bw_idx]
     df, cp_ratio = LTE_PROFILES[profile_idx]
-    # N (Tamaño FFT) es la potencia de 2 siguiente a Nc
-    n_fft = int(2**(np.ceil(np.log2(nc))))
-    return n_fft, nc, cp_ratio, df
+    
+    M = nc                                      # M = Tamaño DFT (Subportadoras Activas)
+    N = int(2**(np.ceil(np.log2(nc))))          # N = Tamaño IDFT (Total FFT)
+    
+    return N, M, cp_ratio, df
 
 def image_to_bits(image_path, size):
     """Convierte imagen a flujo de bits"""

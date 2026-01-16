@@ -265,7 +265,7 @@ class MainWindow(ctk.CTk):
         }
 
         self.embed_plot(self.tab_papr, thresholds, data, 
-                       "Impacto de SC-FDM en PAPR (Datos Reales Scrambleados)", 
+                       "Impacto de SC-FDM en PAPR", 
                        "Umbral (dB)", "Probabilidad (CCDF)", log_y=True)
         
         self.lbl_status.configure(text="Comparación PAPR generada.")

@@ -15,48 +15,70 @@ class OFDMSimulationManager:
 
     def run_image_transmission(self, image_path, bw_idx, profile_idx, mod_type, snr_db, num_paths, is_scfdm=False):
         """
-        Ejecuta la cadena: Imagen -> Scramble -> [Precoding si es SC-FDM] -> OFDM -> Canal -> ...
+        Ejecuta la cadena de transmisión.
         """
         try:
-            n_fft, nc, cp_ratio, df = utils.get_ofdm_params(bw_idx, profile_idx)
+            # 1. CONFIGURACIÓN FÍSICA
+            # M = Tamaño DFT (Subportadoras Activas, ej. 600)
+            # N = Tamaño IFFT (Total FFT, ej. 1024)
+            N, M, cp_ratio, df = utils.get_ofdm_params(bw_idx, profile_idx)
+            
             img_size = 250
             
-            # 1. Obtener bits y scrambling
+            # 2. GENERACIÓN DE BITS Y SCRAMBLING
             tx_bits_raw, tx_img_matrix = utils.image_to_bits(image_path, img_size)
             tx_bits = utils.apply_scrambling(tx_bits_raw)
             
-            # 2. Mapeo a Símbolos
+            # 3. MAPEO A SÍMBOLOS (Constelación QAM)
             tx_symbols = utils.map_bits_to_symbols(tx_bits, mod_type)
 
-            # 3. SC-FDM: Precodificación 
+            # 4. PRECODIFICACIÓN (Solo SC-FDM) -> Dominio de Frecuencia
             if is_scfdm:
-                tx_symbols = ofdm_ops.apply_dft_precoding(tx_symbols, nc)
+                # La DFT es del tamaño de los datos activos
+                tx_payload = ofdm_ops.apply_dft_precoding(tx_symbols, M)
+            else:
+                # En OFDM puro, los símbolos pasan directo
+                tx_payload = tx_symbols
             
-            # 4. Modulación OFDM
-            ofdm_time_signal, num_blocks = ofdm_ops.modulate_ofdm(tx_symbols, n_fft, nc)
-            tx_signal_cp, cp_len = ofdm_ops.add_cyclic_prefix(ofdm_time_signal, num_blocks, n_fft, cp_ratio)
+            # 5. MODULACIÓN (IFFT) -> Dominio del Tiempo
+            # Aquí ocurre el Mapeo de Subportadoras: Entran M, salen N
+            ofdm_time_signal, num_blocks = ofdm_ops.modulate_ofdm(tx_payload, N, M)
             
-            # 5. Canal
+            # 6. PREFIJO CÍCLICO
+            # El CP se añade a la señal en tiempo (tamaño N)
+            tx_signal_cp, cp_len = ofdm_ops.add_cyclic_prefix(ofdm_time_signal, num_blocks, N, cp_ratio)
+            
+            # 7. CANAL (Rayleigh + AWGN)
             rx_signal_cp, h_channel = channel.apply_rayleigh(tx_signal_cp, snr_db, num_taps=num_paths)
             
-            # 6. Recepción
-            rx_signal_no_cp = ofdm_ops.remove_cyclic_prefix(rx_signal_cp, n_fft, cp_len)
-            rx_symbols_distorted = ofdm_ops.demodulate_ofdm(rx_signal_no_cp, n_fft, nc)
-            rx_symbols_equalized = ofdm_ops.equalize_channel(rx_symbols_distorted, h_channel, n_fft, nc)
+            # 8. RECEPCIÓN: QUITAR CP
+            rx_signal_no_cp = ofdm_ops.remove_cyclic_prefix(rx_signal_cp, N, cp_len)
             
-            # 7. SC-FDM: Remover Precodificación
+            # 9. DEMODULACIÓN (FFT) -> Recuperar M datos
+            # FFT de tamaño N, extraemos M subportadoras
+            rx_raw_symbols = ofdm_ops.demodulate_ofdm(rx_signal_no_cp, N, M)
+            
+            # 10. ECUALIZACIÓN (Zero Forcing)
+            # Se realiza sobre las M subportadoras activas
+            rx_equalized = ofdm_ops.equalize_channel(rx_raw_symbols, h_channel, N, M)
+            
+            # 11. DECODIFICACIÓN (IDFT) -> Solo SC-FDM
             if is_scfdm:
-                rx_symbols_equalized = ofdm_ops.remove_dft_precoding(rx_symbols_equalized, nc)
+                # IDFT de tamaño M para volver a los símbolos QAM originales
+                rx_final_symbols = ofdm_ops.remove_dft_precoding(rx_equalized, M)
+            else:
+                rx_final_symbols = rx_equalized
             
-            # 8. Demodulación y descrambling
-            rx_bits_scrambled = utils.demap_symbols_to_bits(rx_symbols_equalized, mod_type)
+            # 12. DEMAPEO Y DESCRAMBLING
+            rx_bits_scrambled = utils.demap_symbols_to_bits(rx_final_symbols, mod_type)
             
-            # Ajustar longitud y Descramblear
+            # Ajuste final de longitud (recortar padding de bloques si sobra)
             valid_len = len(tx_bits)
             rx_bits_scrambled = rx_bits_scrambled[:valid_len]
+            
             rx_bits = utils.apply_scrambling(rx_bits_scrambled)
             
-            # 9. Métricas (Comparando con RAW)
+            # 13. MÉTRICAS
             bit_errors = np.sum(tx_bits_raw != rx_bits)
             ber = bit_errors / valid_len
             rx_img_matrix = utils.bits_to_image(rx_bits, img_size)
@@ -69,7 +91,7 @@ class OFDMSimulationManager:
                 "rx_image": rx_img_matrix,
                 "ber": ber,
                 "snr": snr_db,
-                "info": f"BER: {ber:.5f} | Modo: {mode_str}"
+                "info": f"BER: {ber:.5f} | Modo: {mode_str} | M={M}, N={N}"
             }
 
         except Exception as e:
